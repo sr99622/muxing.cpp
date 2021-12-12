@@ -157,6 +157,7 @@
     <ClInclude Include="AudioGenerator.h" />
     <ClInclude Include="AudioStream.h" />
     <ClInclude Include="AVObject.h" />
+    <ClInclude Include="CircularQueue.h" />
     <ClInclude Include="FileWriter.h" />
     <ClInclude Include="OutputStream.h" />
     <ClInclude Include="VideoGenerator.h" />
