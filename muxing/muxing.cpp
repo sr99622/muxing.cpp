@@ -59,9 +59,10 @@ void video_frame_maker(VideoGenerator* generator, CircularQueue<AVFrame*>* q)
     bool running = true;
     while (running) {
         AVFrame* frame = copyFrame(generator->getFrame());
-        q->push(frame);
         if (frame == NULL)
             running = false;
+        else
+            q->push(frame);
     }
 }
 
@@ -70,9 +71,10 @@ void audio_frame_maker(AudioGenerator* generator, CircularQueue<AVFrame*>* q)
     bool running = true;
     while (running) {
         AVFrame* frame = copyFrame(generator->getFrame());
-        q->push(frame);
         if (frame == NULL)
             running = false;
+        else
+            q->push(frame);
     }
 }
 
@@ -90,10 +92,22 @@ void encoder(FileWriter* writer, CircularQueue<AVFrame*>* video_q, CircularQueue
 
     while (encoding) {
         if (capturingVideo) {
-            videoFrame = video_q->pop();
+            try {
+                videoFrame = video_q->pop();
+            }
+            catch (const QueueClosedException& e) {
+                videoFrame = NULL;
+                std::cout << "video_q exception: " << e.what() << std::endl;
+            }
         }
         if (capturingAudio) {
-            audioFrame = audio_q->pop();
+            try {
+                audioFrame = audio_q->pop();
+            }
+            catch (const QueueClosedException& e) {
+                audioFrame = NULL;
+                std::cout << "audio_q exception: " << e.what() << std::endl;
+            }
         }
 
         int comparator = 1;
@@ -169,7 +183,9 @@ int main(int argc, char** argv)
     std::thread file_writer(encoder, writer, &video_q, &audio_q);
 
     video_producer.join();
+    video_q.flush();
     audio_producer.join();
+    audio_q.flush();
     file_writer.join();
 
     return 0;
