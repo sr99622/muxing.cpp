@@ -59,7 +59,7 @@ void CircularQueue<T>::push(T const& element)
 
 	while (current_size == max_size) {
 		// queue full
-
+		
 		if (closed)
 			break;
 
@@ -171,6 +171,7 @@ void CircularQueue<T>::flush()
 {
 	std::lock_guard<std::mutex> lock(mutex);
 	active = false;
+	cond_pop.notify_all();
 }
 
 /*
@@ -188,3 +189,4 @@ int CircularQueue<T>::local_size()
 	}
 }
 */
+

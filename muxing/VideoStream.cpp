@@ -9,7 +9,7 @@ VideoStream::VideoStream(AVObject* parent)
     AVCodecID codec_id = fmt_ctx->oformat->video_codec;
 
     try {
-        av.ck(codec = avcodec_find_encoder(codec_id), codec_id, CmdTag::AFE);
+        av.ck(codec = avcodec_find_encoder(codec_id), std::string("avcodec_find_decoder could not find ") + avcodec_get_name(codec_id));
         av.ck(pkt = av_packet_alloc(), CmdTag::APA);
         av.ck(stream = avformat_new_stream(fmt_ctx, NULL), CmdTag::ANS);
         stream->id = fmt_ctx->nb_streams - 1;

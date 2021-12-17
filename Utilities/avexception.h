@@ -59,6 +59,7 @@ enum class CmdTag {
     ARP,
     AIWF,
     AFE,
+    AFD,
     AAC3,
     AFA,
     AAC,
@@ -71,6 +72,7 @@ enum class CmdTag {
     AFIF,
     APA,
     ADC,
+    AIA,
     SA,
     SI,
     SC
@@ -79,12 +81,12 @@ enum class CmdTag {
 class AVException : public std::exception
 {
 public:
-    AVException(char* msg);
+    AVException(const std::string& msg);
 
     const char* what() const throw () {
         return buffer;
     }
-    char* buffer;
+    const char* buffer;
 };
 
 class AVExceptionHandler
@@ -93,17 +95,24 @@ class AVExceptionHandler
 public:
     void ck(int ret);
     void ck(int ret, CmdTag cmd_tag);
+    void ck(int ret, std::string msg);
     void ck(AVFrame* arg, CmdTag cmd_tag = CmdTag::NONE);
     void ck(const AVCodec* arg, CmdTag cmd_tag = CmdTag::NONE);
-    void ck(const AVCodec* arg, AVCodecID codec_id, CmdTag cmd_tag = CmdTag::NONE);
     void ck(AVPacket* arg, CmdTag cmd_tag = CmdTag::NONE);
     void ck(AVCodecContext* arg, CmdTag cmd_tag = CmdTag::NONE);
     void ck(AVStream* arg, CmdTag cmd_tag = CmdTag::NONE);
     void ck(SwrContext* arg, CmdTag cmd_tag = CmdTag::NONE);
     void ck(SwsContext* arg, CmdTag cmd_tag = CmdTag::NONE);
+    void ck(AVFrame* arg, const std::string& msg);
+    void ck(const AVCodec* arg, const std::string& msg);
+    void ck(AVPacket* arg, const std::string& msg);
+    void ck(AVCodecContext* arg, const std::string& msg);
+    void ck(AVStream* arg, const std::string& msg);
+    void ck(SwrContext* arg, const std::string& msg);
+    void ck(SwsContext* arg, const std::string& msg);
+
     const AVException getNullException(CmdTag cmd_tag);
     const char* tag(CmdTag cmd_tag);
-
 };
 
 #endif // AVEXCEPTION_H

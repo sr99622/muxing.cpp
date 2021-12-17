@@ -1,3 +1,5 @@
+#pragma once
+
 extern "C" {
 #include <libavutil/avassert.h>
 #include <libavutil/channel_layout.h>
@@ -26,4 +28,3 @@ public:
     struct SwrContext* swr_ctx;
     int samples_count;
 };
-#pragma once
