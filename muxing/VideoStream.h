@@ -13,18 +13,29 @@ extern "C" {
 }
 
 #include "../Utilities/avexception.h"
-#include "AVObject.h"
-#include "OutputStream.h"
+#include "StreamParameters.h"
+#include "CircularQueue.h"
 
-class VideoStream : public OutputStream
+class VideoStream
 {
 public:
-    VideoStream(AVObject* parent);
-    static AVFrame* allocateFrame(AVCodecContext* codec_ctx);
-    static AVFrame* allocateFrame(AVPixelFormat pix_fmt, int width, int height);
-    int writeFrame(AVFrame* frame_in) override;
-    void close() override;
+    VideoStream(void* parent, const StreamParameters& params, CircularQueue<AVPacket*>* pkt_q);
+    ~VideoStream();
+    int writeFrame(AVFrame* frame_in);
+    void close();
 
-    AVObject* parent;
+    void* parent;
+    AVStream* stream;
+    AVCodecContext* enc_ctx;
+    AVPacket* pkt;
+    AVExceptionHandler av;
+
+    AVHWDeviceType hw_device_type = AV_HWDEVICE_TYPE_NONE;
+    AVBufferRef* hw_frames_ref = NULL;
+    AVBufferRef* hw_device_ctx = NULL;
+    AVFrame* hw_frame = NULL;
+
+    CircularQueue<AVPacket*>* pkt_q;
+
 };
 

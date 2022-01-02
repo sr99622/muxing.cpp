@@ -14,39 +14,24 @@ extern "C" {
 
 #include "../Utilities/avexception.h"
 
-#include "AVObject.h"
 #include "AudioStream.h"
 #include "VideoStream.h"
+#include "StreamParameters.h"
 
-struct StreamParameters
-{
-    // VIDEO
-    AVPixelFormat pix_fmt;
-    int width;
-    int height;
-    int video_bit_rate;
-    int frame_rate;
-    int gop_size;
-
-    // AUDIO
-    AVSampleFormat sample_fmt;
-    uint64_t channel_layout;
-    int audio_bit_rate;
-    int sample_rate;
-
-    AVDictionary* opts = NULL;
-};
-
-class FileWriter : public AVObject
+class FileWriter
 {
 public:
-    FileWriter(const char* filename, StreamParameters* params);
-    void close();
+    FileWriter(const StreamParameters& params);
+    ~FileWriter();
+    void openFile(const char* filename);
+    void writeFrame(AVPacket* pkt);
+    void closeFile();
 
     AVFormatContext* fmt_ctx;
-    VideoStream* videoStream = NULL;
-    AudioStream* audioStream = NULL;
+    //VideoStream* videoStream = NULL;
+    //AudioStream* audioStream = NULL;
+    AVDictionary* opts;
     AVExceptionHandler av;
-    StreamParameters* params;
+
 };
 

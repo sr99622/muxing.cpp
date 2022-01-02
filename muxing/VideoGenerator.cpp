@@ -1,18 +1,28 @@
 #include "VideoGenerator.h"
 
-VideoGenerator::VideoGenerator(AVCodecContext* enc)
+VideoGenerator::VideoGenerator(const StreamParameters& params)
 {
     next_pts = 0;
-    width = enc->width;
-    height = enc->height;
-    pix_fmt = enc->pix_fmt;
-    time_base = enc->time_base;
+    width = params.width;
+    height = params.height;
+    pix_fmt = params.pix_fmt;
+    time_base = params.video_time_base;
 
     try {
-        av.ck(frame = VideoStream::allocateFrame(enc));
-        av.ck(av_frame_make_writable(frame), CmdTag::AFMW);
-        av.ck(yuv_frame = VideoStream::allocateFrame(AV_PIX_FMT_YUV420P, width, height));
-        av.ck(av_frame_make_writable(yuv_frame), CmdTag::AFMW);
+        av.ck(frame = av_frame_alloc(), CmdTag::AFA);
+        frame->format = params.pix_fmt;
+        frame->width = params.width;
+        frame->height = params.height;
+        av.ck(av_frame_get_buffer(frame, 0), CmdTag::AFGB);
+        //av.ck(av_frame_make_writable(frame), CmdTag::AFMW);
+
+        av.ck(yuv_frame = av_frame_alloc(), CmdTag::AFA);
+        yuv_frame->format = AV_PIX_FMT_YUV420P;
+        yuv_frame->width = params.width;
+        yuv_frame->height = params.height;
+        av.ck(av_frame_get_buffer(yuv_frame, 0), CmdTag::AFGB);
+        //av.ck(av_frame_make_writable(yuv_frame), CmdTag::AFMW);
+
     }
     catch (const AVException& e) {
         std::cerr << "VideoGenerator constructor exception: " << e.what() << std::endl;
@@ -48,8 +58,9 @@ void VideoGenerator::fillFrame(AVFrame* pict, int frame_index)
 
 AVFrame* VideoGenerator::getFrame()
 {
-    if (av_compare_ts(next_pts, time_base, STREAM_DURATION, av_make_q(1, 1)) > 0)
+    if (av_compare_ts(next_pts, time_base, STREAM_DURATION, av_make_q(1, 1)) > 0) {
         return NULL;
+    }
 
     try {
         if (pix_fmt != AV_PIX_FMT_YUV420P) {

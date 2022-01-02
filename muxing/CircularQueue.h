@@ -30,9 +30,10 @@ private:
 
 public:
 	CircularQueue(size_t max_size);
+	~CircularQueue();
 	void push(T const&);
 	T pop();
-	T peek();
+	void pop(T&);
 	int size();
 	void close();
 	void open();
@@ -50,6 +51,12 @@ CircularQueue<T>::CircularQueue(size_t max_size)
 	closed = false;
 	active = true;
 	current_size = 0;
+}
+
+template <typename T>
+CircularQueue<T>::~CircularQueue()
+{
+
 }
 
 template <typename T>
@@ -104,8 +111,9 @@ T CircularQueue<T>::pop()
 			cond_pop.notify_all();
 		}
 
-		if (closed)
+		if (closed) {
 			break;
+		}
 
 		cond_pop.wait(lock);
 	}
@@ -131,10 +139,42 @@ T CircularQueue<T>::pop()
 }
 
 template <typename T>
-T CircularQueue<T>::peek()
+void CircularQueue<T>::pop(T& arg)
 {
 	std::unique_lock<std::mutex> lock(mutex);
-	return data[front];
+
+	while (front == -1) {
+		// queue empty
+
+		if (!active) {
+			closed = true;
+			cond_pop.notify_all();
+		}
+
+		if (closed) {
+			break;
+		}
+
+		cond_pop.wait(lock);
+	}
+
+	if (closed) {
+		QueueClosedException e;
+		throw e;
+	}
+
+	arg = data[front];
+	if (front == rear) {
+		front = rear = -1;
+	}
+	else if (front == max_size - 1) {
+		front = 0;
+	}
+	else {
+		front++;
+	}
+	cond_push.notify_one();
+	current_size--;
 }
 
 template <typename T>

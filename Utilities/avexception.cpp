@@ -1,24 +1,3 @@
-/*******************************************************************************
-* avexception.cpp
-*
-* Copyright (c) 2020 Stephen Rhodes
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation; either version 2 of the License, or
-* (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License along
-* with this program; if not, write to the Free Software Foundation, Inc.,
-* 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-*
-*******************************************************************************/
-
 #include "avexception.h"
 
 AVException::AVException(const std::string& msg)
@@ -28,10 +7,7 @@ AVException::AVException(const std::string& msg)
 
 void AVExceptionHandler::ck(int ret)
 {
-    if (ret < 0) {
-        AVException e("an AV exception has occurred");
-        throw e;
-    }
+    if (ret < 0) throw AVException("an AV exception has occurred");
 }
 
 void AVExceptionHandler::ck(int ret, CmdTag cmd_tag)
@@ -39,122 +15,52 @@ void AVExceptionHandler::ck(int ret, CmdTag cmd_tag)
     if (ret < 0) {
         char av_str[256];
         av_strerror(ret, av_str, 256);
-        AVException e(tag(cmd_tag) + std::string(" has failed with error: ") + av_str);
-        throw e;
+        throw AVException(tag(cmd_tag) + std::string(" has failed with error: ") + av_str);
     }
 }
 
-void AVExceptionHandler::ck(int ret, std::string msg)
+void AVExceptionHandler::ck(int ret, const std::string& msg)
 {
     if (ret < 0) {
         char av_str[256];
         av_strerror(ret, av_str, 256);
-        AVException e(msg + std::string(" ") + av_str);
-        throw e;
+        throw AVException(msg + std::string(" ") + av_str);
     }
 }
 
-void AVExceptionHandler::ck(AVFrame* arg, CmdTag cmd_tag)
+void AVExceptionHandler::ck(void* arg, CmdTag cmd_tag)
 {
     if (arg == NULL) throw getNullException(cmd_tag);
 }
 
-void AVExceptionHandler::ck(const AVCodec* arg, CmdTag cmd_tag)
+void AVExceptionHandler::ck(void* arg, const std::string& msg)
+{
+    if (arg == NULL) throw AVException(msg);
+}
+
+void AVExceptionHandler::ck(const void* arg, CmdTag cmd_tag)
 {
     if (arg == NULL) throw getNullException(cmd_tag);
 }
 
-void AVExceptionHandler::ck(AVPacket* arg, CmdTag cmd_tag)
+void AVExceptionHandler::ck(const void* arg, const std::string& msg)
 {
-    if (arg == NULL) throw getNullException(cmd_tag);
-}
-
-void AVExceptionHandler::ck(AVCodecContext* arg, CmdTag cmd_tag)
-{
-    if (arg == NULL) throw getNullException(cmd_tag);
-}
-
-void AVExceptionHandler::ck(SwrContext* arg, CmdTag cmd_tag)
-{
-    if (arg == NULL) throw getNullException(cmd_tag);
-}
-
-void AVExceptionHandler::ck(SwsContext* arg, CmdTag cmd_tag)
-{
-    if (arg == NULL) throw getNullException(cmd_tag);
-}
-
-void AVExceptionHandler::ck(AVStream* arg, CmdTag cmd_tag)
-{
-    if (arg == NULL) throw getNullException(cmd_tag);
-}
-
-void AVExceptionHandler::ck(AVFrame* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
-}
-
-void AVExceptionHandler::ck(const AVCodec* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
-}
-
-void AVExceptionHandler::ck(AVPacket* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
-}
-
-void AVExceptionHandler::ck(AVCodecContext* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
-}
-
-void AVExceptionHandler::ck(SwrContext* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
-}
-
-void AVExceptionHandler::ck(SwsContext* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
-}
-
-void AVExceptionHandler::ck(AVStream* arg, const std::string& msg)
-{
-    if (arg == NULL) {
-        AVException e(msg);
-        throw e;
-    }
+    if (arg == NULL) throw AVException(msg);
 }
 
 const AVException AVExceptionHandler::getNullException(CmdTag cmd_tag)
 {
     if (cmd_tag == CmdTag::NONE) {
-        AVException e("a NULL exception has occurred");
-        return e;
+        return AVException("a NULL exception has occurred");
     }
     else {
-        AVException e(tag(cmd_tag) + std::string(" has failed with NULL value"));
-        return e;
+        return AVException(tag(cmd_tag) + std::string(" has failed with NULL value"));
     }
+}
+
+void AVExceptionHandler::showError(const std::string& error_msg)
+{
+    std::cout << error_msg << std::endl;
 }
 
 const char* AVExceptionHandler::tag(CmdTag cmd_tag)
@@ -222,12 +128,34 @@ const char* AVExceptionHandler::tag(CmdTag cmd_tag)
         return "av_frame_copy";
     case CmdTag::ABR:
         return "av_buffer_ref";
+    case CmdTag::AGF:
+        return "av_guess_format";
+    case CmdTag::AHCA:
+        return "avcodec_find_encoder_by_name";
+    case CmdTag::AHCI:
+        return "av_hwframe_ctx_init";
+    case CmdTag::AHGB:
+        return "av_hwframe_get_buffer";
+    case CmdTag::AFEBN:
+        return "avcodec_find_encoder_by_name";
+    case CmdTag::AICTB:
+        return "av_image_copy_to_buffer";
+    case CmdTag::APFDG:
+        return "av_pix_fmt_desc_get";
+    case CmdTag::AGPFN:
+        return "av_get_pix_fmt_name";
     case CmdTag::AHFTBN:
         return "av_hwdevice_find_type_by_name";
     case CmdTag::AGHC:
         return "avcodec_get_hw_config";
+    case CmdTag::AHTD:
+        return "av_hwframe_transfer_data";
     case CmdTag::ANS:
         return "avformat_new_stream";
+    case CmdTag::AFR:
+        return "av_frame_ref";
+    case CmdTag::AFCP:
+        return "av_frame_copy_props";
     case CmdTag::SGC:
         return "sws_getContext";
     case CmdTag::AFIF:
@@ -238,6 +166,8 @@ const char* AVExceptionHandler::tag(CmdTag cmd_tag)
         return "av_dict_copy";
     case CmdTag::AIA:
         return "av_image_alloc";
+    case CmdTag::AM:
+        return "av_malloc";
     case CmdTag::SA:
         return "swr_alloc";
     case CmdTag::SI:

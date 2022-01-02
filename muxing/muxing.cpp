@@ -1,32 +1,5 @@
-/*
- * Copyright (c) 2003 Fabrice Bellard
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
- /**
-  * @file
-  * libavformat API example.
-  *
-  * Output a media file in any supported libavformat format. The default
-  * codecs are used.
-  * @example muxing.c
+ /*
+  * derived from @example muxing.c Copyright (c) 2003 Fabrice Bellard
   */
 
 #include <queue>
@@ -59,10 +32,9 @@ void video_frame_maker(VideoGenerator* generator, CircularQueue<AVFrame*>* q)
     bool running = true;
     while (running) {
         AVFrame* frame = copyFrame(generator->getFrame());
+        q->push(frame);
         if (frame == NULL)
             running = false;
-        else
-            q->push(frame);
     }
 }
 
@@ -71,18 +43,211 @@ void audio_frame_maker(AudioGenerator* generator, CircularQueue<AVFrame*>* q)
     bool running = true;
     while (running) {
         AVFrame* frame = copyFrame(generator->getFrame());
+        q->push(frame);
         if (frame == NULL)
             running = false;
-        else
-            q->push(frame);
     }
 }
 
-void encoder(FileWriter* writer, CircularQueue<AVFrame*>* video_q, CircularQueue<AVFrame*>* audio_q)
+void video_encoder(VideoStream* stream, CircularQueue<AVFrame*>* frame_q)
+{
+    bool running = true;
+    while (running) {
+        AVFrame* frame = frame_q->pop();
+        stream->writeFrame(frame);
+        if (frame == NULL) {
+            running = false;
+            stream->pkt_q->push(NULL);
+        }
+        else {
+            av_frame_free(&frame);
+        }
+    }
+}
+
+void audio_encoder(AudioStream* stream, CircularQueue<AVFrame*>* frame_q)
+{
+    bool running = true;
+    while (running) {
+        AVFrame* frame = frame_q->pop();
+        stream->writeFrame(frame);
+        if (frame == NULL) {
+            running = false;
+            stream->pkt_q->push(NULL);
+        }
+        else {
+            av_frame_free(&frame);
+        }
+    }
+}
+
+void video_audio_handler(FileWriter* writer, CircularQueue<AVPacket*>* video_pkt_q, CircularQueue<AVPacket*>* audio_pkt_q)
 {
     bool encoding = true;
-    bool capturingVideo = true;
-    bool capturingAudio = true;
+    bool capturingVideo = false;
+    if (video_pkt_q)
+        capturingVideo = true;
+    bool capturingAudio = false;
+    if (audio_pkt_q)
+        capturingAudio = true;
+
+    AVPacket* videoPkt = NULL;
+    AVPacket* audioPkt = NULL;
+
+    int video_frame_count = 0;
+    int audio_frame_count = 0;
+
+    while (encoding) {
+        if (capturingVideo) {
+            try {
+                videoPkt = video_pkt_q->pop();
+                if (!videoPkt) {
+                    capturingVideo = false;
+                }
+            }
+            catch (const QueueClosedException& e) {
+                std::cout << "video_pkt_q exception: " << e.what() << std::endl;
+            }
+        }
+        if (capturingAudio) {
+            try {
+                audioPkt = audio_pkt_q->pop();
+                if (!audioPkt) {
+                    capturingAudio = false;
+                }
+            }
+            catch (const QueueClosedException& e) {
+                std::cout << "audio_pkt_q exception: " << e.what() << std::endl;
+            }
+        }
+
+        int comparator = 1;
+        if (videoPkt && audioPkt) {
+            //comparator = av_compare_ts(videoFrame->pts, videoStream->enc_ctx->time_base,
+            //    audioFrame->pts, audioStream->enc->time_base);
+            if (videoPkt->pts > audioPkt->pts)
+                comparator = 1;
+            else
+                comparator = -1;
+        }
+        else {
+            if (videoPkt)
+                comparator = -1;
+        }
+
+        if (comparator > 0) {
+            if (audioPkt) {
+                //std::cout << "audio write pts: " << audioFrame->pts << std::endl;
+                writer->writeFrame(audioPkt);
+                av_packet_free(&audioPkt);
+                audio_frame_count++;
+                capturingVideo = false;
+                capturingAudio = true;
+            }
+            else {
+                capturingAudio = false;
+            }
+        }
+        else {
+            if (videoPkt) {
+                //std::cout << "video write pts: " << videoFrame->pts << std::endl;
+                writer->writeFrame(videoPkt);
+                av_packet_free(&videoPkt);
+                video_frame_count++;
+                capturingVideo = true;
+                capturingAudio = false;
+            }
+            else {
+                capturingVideo = false;
+            }
+        }
+
+        if (!(capturingVideo || capturingAudio)) {
+            encoding = false;
+        }
+    }
+    std::cout << "video_frame_count: " << video_frame_count << std::endl;
+    std::cout << "audio_frame_count: " << audio_frame_count << std::endl;
+}
+
+int main(int argc, char** argv)
+{
+    const char* filename = "test.mp4";
+    StreamParameters params;
+    params.format = "mp4";
+    params.pix_fmt = AV_PIX_FMT_YUV420P;
+    params.width = 640;
+    params.height = 480;
+    params.frame_rate = 25;
+    params.video_time_base = av_make_q(1, params.frame_rate);
+    params.video_bit_rate = 600000;
+    params.gop_size = 12;
+    params.sample_fmt = AV_SAMPLE_FMT_FLTP;
+    params.audio_bit_rate = 64000;
+    params.sample_rate = 44100;
+    params.audio_time_base = av_make_q(1, params.sample_rate);
+    params.channel_layout = AV_CH_LAYOUT_STEREO;
+    params.channels = 2;
+    params.nb_samples = 1024;
+    params.audio_codec_name = "aac";
+    params.hw_device_type = AV_HWDEVICE_TYPE_CUDA;
+    params.hw_pix_fmt = AV_PIX_FMT_CUDA;
+    params.sw_pix_fmt = AV_PIX_FMT_YUV420P;
+    params.video_codec_name = "h264_nvenc";
+    params.profile = "high";
+
+    VideoGenerator videoGenerator(params);
+    AudioGenerator audioGenerator(params);
+
+    FileWriter writer(params);
+
+    CircularQueue<AVPacket*> video_pkt_q(10);
+    CircularQueue<AVPacket*> audio_pkt_q(10);
+
+    VideoStream videoStream(&writer, params, &video_pkt_q);
+    AudioStream audioStream(&writer, params, &audio_pkt_q);
+
+    CircularQueue<AVFrame*> video_frame_q(10);
+    CircularQueue<AVFrame*> audio_frame_q(10);
+    CircularQueue<AVFrame*>* ptr = NULL;
+
+    writer.openFile(filename);
+
+    std::thread video_producer(video_frame_maker, &videoGenerator, &video_frame_q);
+    std::thread audio_producer(audio_frame_maker, &audioGenerator, &audio_frame_q);
+    std::thread video_encoding(video_encoder, &videoStream, &video_frame_q);
+    std::thread audio_encoding(audio_encoder, &audioStream, &audio_frame_q);
+    std::thread file_writing(video_audio_handler, &writer, &video_pkt_q, &audio_pkt_q);
+
+    video_producer.join();
+    //video_frame_q.flush();
+    audio_producer.join();
+    //audio_frame_q.flush();
+    video_encoding.join();
+    audio_encoding.join();
+    file_writing.join();
+    
+    writer.closeFile();
+
+    return 0;
+}
+
+
+
+
+
+
+/*
+void encoder(FileWriter* writer, VideoStream* videoStream, CircularQueue<AVFrame*>* video_q,
+    AudioStream* audioStream, CircularQueue<AVFrame*>* audio_q)
+{
+    bool encoding = true;
+    bool capturingVideo = false;
+    if (video_q)
+        capturingVideo = true;
+    bool capturingAudio = false;
+    if (audio_q)
+        capturingAudio = true;
 
     AVFrame* videoFrame = NULL;
     AVFrame* audioFrame = NULL;
@@ -94,32 +259,42 @@ void encoder(FileWriter* writer, CircularQueue<AVFrame*>* video_q, CircularQueue
         if (capturingVideo) {
             try {
                 videoFrame = video_q->pop();
+                if (!videoFrame) {
+                    capturingVideo = false;
+                    std::cout << "video - got null ptr eof" << std::endl;
+                }
             }
             catch (const QueueClosedException& e) {
-                videoFrame = NULL;
                 std::cout << "video_q exception: " << e.what() << std::endl;
             }
         }
         if (capturingAudio) {
             try {
                 audioFrame = audio_q->pop();
+                if (!audioFrame) {
+                    capturingAudio = false;
+                    std::cout << "audio - got null ptr eof" << std::endl;
+                }
             }
             catch (const QueueClosedException& e) {
-                audioFrame = NULL;
                 std::cout << "audio_q exception: " << e.what() << std::endl;
             }
         }
 
         int comparator = 1;
         if (videoFrame && audioFrame) {
-            comparator = av_compare_ts(videoFrame->pts, writer->videoStream->enc->time_base,
-                audioFrame->pts, writer->audioStream->enc->time_base);
+            comparator = av_compare_ts(videoFrame->pts, videoStream->enc_ctx->time_base,
+                audioFrame->pts, audioStream->enc->time_base);
+        }
+        else {
+            if (videoFrame)
+                comparator = -1;
         }
 
         if (comparator > 0) {
             if (audioFrame) {
                 //std::cout << "audio write pts: " << audioFrame->pts << std::endl;
-                writer->audioStream->writeFrame(audioFrame);
+                audioStream->writeFrame(audioFrame);
                 av_frame_free(&audioFrame);
                 audio_frame_count++;
                 capturingVideo = false;
@@ -132,7 +307,7 @@ void encoder(FileWriter* writer, CircularQueue<AVFrame*>* video_q, CircularQueue
         else {
             if (videoFrame) {
                 //std::cout << "video write pts: " << videoFrame->pts << std::endl;
-                writer->videoStream->writeFrame(videoFrame);
+                videoStream->writeFrame(videoFrame);
                 av_frame_free(&videoFrame);
                 video_frame_count++;
                 capturingVideo = true;
@@ -143,50 +318,16 @@ void encoder(FileWriter* writer, CircularQueue<AVFrame*>* video_q, CircularQueue
             }
         }
 
-        if (!(capturingVideo || capturingAudio))
+        if (!(capturingVideo || capturingAudio)) {
+            std::cout << "EOF" << std::endl;
             encoding = false;
+        }
     }
 
-    writer->videoStream->writeFrame(NULL);
-    writer->audioStream->writeFrame(NULL);
-    writer->close();
+    videoStream->writeFrame(NULL);
+    audioStream->writeFrame(NULL);
 
     std::cout << "video_frame_count: " << video_frame_count << std::endl;
     std::cout << "audio_frame_count: " << audio_frame_count << std::endl;
 }
-
-
-int main(int argc, char** argv)
-{
-    const char* filename = "test.mp4";
-    StreamParameters params;
-    params.pix_fmt = AV_PIX_FMT_YUV420P;
-    params.width = 640;
-    params.height = 480;
-    params.frame_rate = 25;
-    params.video_bit_rate = 400000;
-    params.gop_size = 12;
-    params.sample_fmt = AV_SAMPLE_FMT_FLTP;
-    params.audio_bit_rate = 64000;
-    params.sample_rate = 44100;
-    params.channel_layout = AV_CH_LAYOUT_STEREO;
-
-    FileWriter* writer = new FileWriter(filename, &params);
-    AudioGenerator audioGenerator(writer->audioStream->enc);
-    VideoGenerator videoGenerator(writer->videoStream->enc);
-
-    CircularQueue<AVFrame*> video_q(10);
-    CircularQueue<AVFrame*> audio_q(10);
-
-    std::thread video_producer(video_frame_maker, &videoGenerator, &video_q);
-    std::thread audio_producer(audio_frame_maker, &audioGenerator, &audio_q);
-    std::thread file_writer(encoder, writer, &video_q, &audio_q);
-
-    video_producer.join();
-    video_q.flush();
-    audio_producer.join();
-    audio_q.flush();
-    file_writer.join();
-
-    return 0;
-}
+*/

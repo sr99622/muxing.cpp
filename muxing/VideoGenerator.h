@@ -1,11 +1,12 @@
 #pragma once
 
 #include "FileWriter.h"
+#include "StreamParameters.h"
 
 class VideoGenerator
 {
 public:
-    VideoGenerator(AVCodecContext* enc);
+    VideoGenerator(const StreamParameters& params);
     ~VideoGenerator();
     AVFrame* getFrame();
     void fillFrame(AVFrame* pict, int frame_index);

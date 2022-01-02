@@ -13,18 +13,23 @@ extern "C" {
 }
 
 #include "../Utilities/avexception.h"
-#include "AVObject.h"
-#include "OutputStream.h"
+#include "StreamParameters.h"
+#include "CircularQueue.h"
 
-class AudioStream : public OutputStream
+class AudioStream 
 {
 public:
-    AudioStream(AVObject* parent);
-    static AVFrame* allocateFrame(AVSampleFormat sample_fmt, uint64_t channel_layout, int sample_rate, int nb_samples);
-    int writeFrame(AVFrame* frame_in) override;
-    void close() override;
+    AudioStream(void* parent, const StreamParameters& params, CircularQueue<AVPacket*>* pkt_q);
+    ~AudioStream();
+    int writeFrame(AVFrame* frame_in);
+    void close();
 
-    AVObject* parent;
-    struct SwrContext* swr_ctx;
-    int samples_count;
+    void* parent;
+
+    AVStream* stream;
+    AVCodecContext* enc;
+    AVPacket* pkt;
+    AVExceptionHandler av;
+
+    CircularQueue<AVPacket*>* pkt_q;
 };

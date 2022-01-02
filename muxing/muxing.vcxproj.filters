@@ -30,13 +30,13 @@
     <ClCompile Include="VideoGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="OutputStream.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AudioStream.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VideoStream.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="StreamParameters.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -53,19 +53,16 @@
     <ClInclude Include="VideoGenerator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="OutputStream.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="AudioStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="VideoStream.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AVObject.h">
+    <ClInclude Include="CircularQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CircularQueue.h">
+    <ClInclude Include="StreamParameters.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
